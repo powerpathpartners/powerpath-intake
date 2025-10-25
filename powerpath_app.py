@@ -14,13 +14,11 @@ st.markdown("""
         .block-container { padding-top: 1rem; padding-bottom: 2rem; }
         h1, h2, h3 { color: #044874 !important; }
         div[data-testid="stExpanderHeader"] { background-color: #04487410; font-weight:600; }
-        .metric-row { display: flex; gap: 1rem; margin-bottom: 1rem; }
-        .metric-box { flex: 1; background: white; border-radius: 10px; padding: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
     </style>
 """, unsafe_allow_html=True)
 
 # ---------- LOAD SHEET ----------
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1iXj7Z_6IB_4Ng3IB6UOQugFVJJCgW0-l3a17XUD4Ezc/export?format=csv"
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1_K7AOyKjzdwfqM7V9x6FxJYkVz-OSB5nNKbZtygLsak/export?format=csv"
 SHEET_NAME = "PowerPath Project Intake Form (Responses)"
 SUBMISSION_TAB = "Submissions"
 
@@ -29,6 +27,12 @@ try:
 except Exception as e:
     st.error("❌ Could not load the Google Sheet. Make sure link sharing is set to 'Anyone with the link → Viewer'.")
     st.stop()
+
+# --- normalize headers and clean up ---
+df.columns = df.columns.str.strip().str.lower()
+df = df.dropna(axis=1, how='all')
+expected_cols = ["question category","subcategory_code","question","answer_type","priority","weight"]
+df = df[[c for c in expected_cols if c in df.columns]]
 
 # ---------- HEADER ----------
 st.title("⚡ PowerPath Project Intake Form")
@@ -60,8 +64,10 @@ for cat in categories:
             q_type = str(row["answer_type"]).strip().lower()
             weight = float(row.get("weight", 1))
 
+            default = str(row.get("answer", "")) if "answer" in df.columns else ""
+
             if "yes/no" in q_type:
-                ans = st.radio(q_text, ["Yes", "No"], key=q_code)
+                ans = st.radio(q_text, ["Yes", "No"], key=q_code, index=0 if default.lower() == "yes" else 1)
                 score = weight if ans == "Yes" else 0
             elif "date" in q_type:
                 ans = st.date_input(q_text, key=q_code)
@@ -70,7 +76,7 @@ for cat in categories:
                 ans = st.number_input(q_text, key=q_code)
                 score = weight if ans else 0
             else:
-                ans = st.text_input(q_text, key=q_code)
+                ans = st.text_input(q_text, key=q_code, value=default)
                 score = weight if ans else 0
 
             answers[q_code] = ans
@@ -124,7 +130,7 @@ if st.button("💾 Save Results to Sheet"):
             "client_id": "",
             "token_uri": "https://oauth2.googleapis.com/token",
         })
-        sh = gc.open_by_url("https://docs.google.com/spreadsheets/d/1iXj7Z_6IB_4Ng3IB6UOQugFVJJCgW0-l3a17XUD4Ezc")
+        sh = gc.open_by_url("https://docs.google.com/spreadsheets/d/1_K7AOyKjzdwfqM7V9x6FxJYkVz-OSB5nNKbZtygLsak")
         try:
             ws = sh.worksheet(SUBMISSION_TAB)
         except:
