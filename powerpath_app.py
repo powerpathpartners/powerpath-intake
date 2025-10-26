@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import urllib.parse
 from datetime import datetime
 
 # ---------- PAGE CONFIG ----------
@@ -25,10 +26,11 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# ---------- LOAD SHEET ----------
+# ---------- LOAD GOOGLE SHEET ----------
 SHEET_ID = "1_K7AOyKjzdwfqM7V9x6FxJYkVz-OSB5nNKbZtygLsak"
 SHEET_NAME = "PowerPath Project Intake Form (Responses)"
-url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
+encoded_name = urllib.parse.quote(SHEET_NAME)
+url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={encoded_name}"
 
 @st.cache_data(ttl=300)
 def load_data():
@@ -38,18 +40,12 @@ def load_data():
 
 df = load_data()
 
-# ---------- DEBUG INFO ----------
-if st.checkbox("Show data structure (admin only)"):
-    st.write(df.head())
-    st.write("Loaded columns:", list(df.columns))
-
 # ---------- APP TITLE ----------
 st.title("⚙️ PowerPath Project Intake Form")
 st.markdown("Use this tool to assess project readiness across key development categories. Responses auto-score against PowerPath benchmarks.")
 
 # ---------- FORM ----------
 responses = {}
-
 categories = df["question category"].unique()
 
 for category in categories:
