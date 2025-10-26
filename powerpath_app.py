@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
-import gspread
 from datetime import datetime
-from gspread_dataframe import set_with_dataframe
 
 # ---------- PAGE CONFIG ----------
 st.set_page_config(page_title="PowerPath Intake", layout="wide")
@@ -13,146 +11,115 @@ st.markdown("""
         body { background-color: #f6f8fa; color: #222; }
         .block-container { padding-top: 1rem; padding-bottom: 2rem; }
         h1, h2, h3 { color: #044874 !important; }
-        div[data-testid="stExpanderHeader"] { background-color: #04487410; font-weight:600; }
+        div[data-testid="stExpanderHeader"] {
+            background-color: #04487410;
+            font-weight: 600;
+            color: #044874 !important;
+        }
+        .stButton>button {
+            background-color: #044874 !important;
+            color: white !important;
+            font-weight: 600 !important;
+            border-radius: 6px !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
 # ---------- LOAD SHEET ----------
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1_K7AOyKjzdwfqM7V9x6FxJYkVz-OSB5nNKbZtygLsak/export?format=csv"
+SHEET_ID = "1_K7AOyKjzdwfqM7V9x6FxJYkVz-OSB5nNKbZtygLsak"
 SHEET_NAME = "PowerPath Project Intake Form (Responses)"
-SUBMISSION_TAB = "Submissions"
+url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
 
-try:
-    df = pd.read_csv(SHEET_URL)
-except Exception as e:
-    st.error("❌ Could not load the Google Sheet. Make sure link sharing is set to 'Anyone with the link → Viewer'.")
-    st.stop()
+@st.cache_data(ttl=300)
+def load_data():
+    df = pd.read_csv(url)
+    df.columns = df.columns.str.strip().str.lower()
+    return df
 
-# --- normalize headers and clean up ---
-df.columns = df.columns.str.strip().str.lower()
-df = df.dropna(axis=1, how='all')
-expected_cols = ["question category","subcategory_code","question","answer_type","priority","weight"]
-df = df[[c for c in expected_cols if c in df.columns]]
+df = load_data()
 
-# ---------- HEADER ----------
-st.title("⚡ PowerPath Project Intake Form")
-st.caption("Assess and score potential data center development opportunities using PowerPath’s weighted readiness model.")
+# ---------- DEBUG INFO ----------
+if st.checkbox("Show data structure (admin only)"):
+    st.write(df.head())
+    st.write("Loaded columns:", list(df.columns))
 
-# ---------- BASIC INFO ----------
-project_name = st.text_input("Project Name")
-submitted_by = st.text_input("Submitted By")
-timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+# ---------- APP TITLE ----------
+st.title("⚙️ PowerPath Project Intake Form")
+st.markdown("Use this tool to assess project readiness across key development categories. Responses auto-score against PowerPath benchmarks.")
 
-st.markdown("---")
-
-# ---------- BUILD FORM ----------
-answers = {}
-scores = {}
-category_scores = {}
+# ---------- FORM ----------
+responses = {}
 
 categories = df["question category"].unique()
 
-for cat in categories:
-    with st.expander(cat, expanded=False):
-        subset = df[df["question category"] == cat]
-        total_cat_weight = subset["weight"].sum()
-        cat_score = 0
-
+for category in categories:
+    with st.expander(f"### {category}"):
+        subset = df[df["question category"] == category]
         for _, row in subset.iterrows():
-            q_code = row["subcategory_code"]
-            q_text = row["question"]
-            q_type = str(row["answer_type"]).strip().lower()
-            weight = float(row.get("weight", 1))
-
-            default = str(row.get("answer", "")) if "answer" in df.columns else ""
+            q = row["question"]
+            q_type = row["answer_type"].lower()
+            key = row["subcategory_code"]
 
             if "yes/no" in q_type:
-                ans = st.radio(q_text, ["Yes", "No"], key=q_code, index=0 if default.lower() == "yes" else 1)
-                score = weight if ans == "Yes" else 0
-            elif "date" in q_type:
-                ans = st.date_input(q_text, key=q_code)
-                score = weight if ans else 0
+                responses[key] = st.radio(q, ["Yes", "No"], key=key)
             elif "numeric" in q_type:
-                ans = st.number_input(q_text, key=q_code)
-                score = weight if ans else 0
+                responses[key] = st.number_input(q, step=1.0, key=key)
+            elif "date" in q_type:
+                responses[key] = st.date_input(q, key=key)
+            elif "text" in q_type:
+                responses[key] = st.text_input(q, key=key)
             else:
-                ans = st.text_input(q_text, key=q_code, value=default)
-                score = weight if ans else 0
+                responses[key] = st.text_input(q, key=key)
 
-            answers[q_code] = ans
-            scores[q_code] = score
-            cat_score += score
+# ---------- SUBMIT ----------
+if st.button("Submit Intake"):
+    st.success("✅ Intake submitted successfully!")
+    st.session_state["responses"] = responses
 
-        pct = (cat_score / total_cat_weight) * 100 if total_cat_weight > 0 else 0
-        category_scores[cat] = pct
-
-        color = "🟩" if pct >= 75 else "🟨" if pct >= 50 else "🟥"
-        st.write(f"**{color} {cat} Score: {pct:.1f}%**")
-
-st.markdown("---")
-
-# ---------- TOTAL SCORE ----------
-total_score = sum(scores.values())
-max_score = df["weight"].sum()
-index_pct = round((total_score / max_score) * 100, 1)
-tier = (
-    "Tier 1 – Hyperscale Ready" if index_pct >= 75 else
-    "Tier 2 – Advanced Development" if index_pct >= 50 else
-    "Tier 3 – Viable with Conditions" if index_pct >= 25 else
-    "Tier 4 – Early Stage"
-)
-
-st.header("📊 PowerPath Index Summary")
-col1, col2, col3 = st.columns(3)
-col1.metric("Total Weighted Score", f"{total_score:.1f}")
-col2.metric("PowerPath Index", f"{index_pct}%")
-col3.metric("Readiness Tier", tier)
-
-# ---------- CATEGORY SCORE VISUALS ----------
-st.markdown("### Category Breakdown")
-for cat, pct in category_scores.items():
-    color = "#00b050" if pct >= 75 else "#ffc000" if pct >= 50 else "#c00000"
-    st.progress(pct / 100)
-    st.write(f"**{cat}** — {pct:.1f}%")
-
-# ---------- SAVE ----------
-st.markdown("---")
-st.subheader("Save Submission")
-
-if st.button("💾 Save Results to Sheet"):
-    try:
-        gc = gspread.service_account_from_dict({
-            "type": "service_account",
-            "project_id": "powerpath-intake",
-            "private_key_id": "",
-            "private_key": "",
-            "client_email": "",
-            "client_id": "",
-            "token_uri": "https://oauth2.googleapis.com/token",
-        })
-        sh = gc.open_by_url("https://docs.google.com/spreadsheets/d/1_K7AOyKjzdwfqM7V9x6FxJYkVz-OSB5nNKbZtygLsak")
+# ---------- SCORING ----------
+def score_response(row, responses):
+    ans = responses.get(row["subcategory_code"], "")
+    if "yes/no" in row["answer_type"].lower():
+        return row["weight"] if ans == "Yes" else 0
+    elif "numeric" in row["answer_type"].lower():
         try:
-            ws = sh.worksheet(SUBMISSION_TAB)
+            val = float(ans)
+            if val > 0:
+                return min(row["weight"], row["weight"] * 0.75)
+            else:
+                return 0
         except:
-            ws = sh.add_worksheet(title=SUBMISSION_TAB, rows="100", cols="20")
+            return 0
+    elif "date" in row["answer_type"].lower():
+        return row["weight"] * 0.8
+    elif "text" in row["answer_type"].lower():
+        return row["weight"] * 0.5 if ans.strip() else 0
+    return 0
 
-        data = {
-            "Timestamp": [timestamp],
-            "Project Name": [project_name],
-            "Submitted By": [submitted_by],
-            "PowerPath Index": [index_pct],
-            "Tier": [tier],
-            "Total Score": [total_score],
-        }
-        for cat, pct in category_scores.items():
-            data[cat] = [pct]
+# ---------- RESULTS ----------
+if "responses" in st.session_state:
+    df["auto_score"] = df.apply(lambda r: score_response(r, st.session_state["responses"]), axis=1)
+    total_weight = df["weight"].sum()
+    total_score = df["auto_score"].sum()
+    readiness = round((total_score / total_weight) * 100, 1)
+    tier = (
+        "Tier 1 – Hyperscale Ready" if readiness >= 85 else
+        "Tier 2 – Advanced" if readiness >= 65 else
+        "Tier 3 – Developing" if readiness >= 40 else
+        "Tier 4 – Early Stage"
+    )
 
-        df_submit = pd.DataFrame(data)
-        existing = pd.DataFrame(ws.get_all_records())
-        combined = pd.concat([existing, df_submit], ignore_index=True)
-        ws.clear()
-        set_with_dataframe(ws, combined)
+    st.markdown("---")
+    st.subheader("📊 PowerPath Index Summary")
 
-        st.success(f"✅ Submission saved for project: {project_name}")
-    except Exception as e:
-        st.error("⚠️ Could not write to Google Sheet. (Public access mode only reads — full save requires API key setup.)")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Weighted Score", f"{total_score:.1f}")
+    col2.metric("PowerPath Index", f"{readiness}%")
+    col3.metric("Readiness Tier", tier)
+
+    st.markdown("#### Category Breakdown")
+    cat_scores = df.groupby("question category")["auto_score"].sum() / df.groupby("question category")["weight"].sum() * 100
+    st.bar_chart(cat_scores)
+
+else:
+    st.info("⬆️ Fill out the intake form above to calculate readiness and generate your PowerPath Index.")
