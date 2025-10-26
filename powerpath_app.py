@@ -1,130 +1,98 @@
 import streamlit as st
 import pandas as pd
-import urllib.parse
-from datetime import datetime
-from PIL import Image
 
-# ---------- PAGE CONFIG ----------
-st.set_page_config(page_title="The PowerPath Index", layout="wide")
+# --- PAGE SETUP ---
+st.set_page_config(page_title="The PowerPath Index", page_icon="⚡", layout="wide")
 
-# ---------- STYLE ----------
-st.markdown("""
-    <style>
-        body { background-color: #f6f8fa; color: #222; }
-        .block-container { padding-top: 1rem; padding-bottom: 2rem; }
-        h1, h2, h3 { color: #044874 !important; }
-        .title-text { font-size: 2.2rem; font-weight: 700; color: #044874; text-align: center; }
-        .subtitle-text { font-size: 1.2rem; color: #444; text-align: center; margin-top: -0.3rem; }
-        div[data-testid="stExpanderHeader"] {
-            background-color: #04487410;
-            font-weight: 600;
-            color: #044874 !important;
-        }
-        .stButton>button {
-            background-color: #044874 !important;
-            color: white !important;
-            font-weight: 600 !important;
-            border-radius: 6px !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
+# --- LOGO + HEADER ---
+st.markdown(
+    """
+    <div style="text-align:center; margin-top: -10px; margin-bottom: -10px;">
+        <img src="powerpath_logo.png" width="160" style="margin-top:0.5in;">
+    </div>
+    <h1 style="text-align:center; font-size:350%; margin-bottom:0;">
+        The PowerPath Index
+    </h1>
+    <h3 style="text-align:center; font-size:350%; font-weight:normal; margin-top:5px;">
+        Project Intake Form
+    </h3>
+    """,
+    unsafe_allow_html=True,
+)
 
-# ---------- LOGO & HEADER ----------
-logo = Image.open("PPP logo transparent bg.png")
-st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-st.image(logo, width=160)
-st.markdown("<div class='title-text'>The PowerPath Index™</div>", unsafe_allow_html=True)
-st.markdown("<div class='subtitle-text'>Project Intake Form</div><br>", unsafe_allow_html=True)
-st.markdown("</div>", unsafe_allow_html=True)
+st.markdown("---")
 
-# ---------- LOAD GOOGLE SHEET ----------
-SHEET_ID = "1_K7AOyKjzdwfqM7V9x6FxJYkVz-OSB5nNKbZtygLsak"
-SHEET_NAME = "PowerPath Project Intake Form (Responses)"
-encoded_name = urllib.parse.quote(SHEET_NAME)
-url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={encoded_name}"
+# --- FORM SETUP ---
+st.header("Project Information")
 
-@st.cache_data(ttl=300)
-def load_data():
-    df = pd.read_csv(url)
-    df.columns = df.columns.str.strip().str.lower()
-    return df
+with st.form("project_form"):
+    col1, col2 = st.columns(2)
 
-df = load_data()
+    with col1:
+        project_name = st.text_input("Project Name")
+        location = st.text_input("Location (City, State)")
+        acreage = st.number_input("Acreage", min_value=0.0, step=0.1)
+        owner = st.text_input("Owner/Developer")
 
-# ---------- FORM ----------
-st.markdown("Use this tool to assess project readiness across key development categories. Responses auto-score against PowerPath benchmarks.")
-
-responses = {}
-categories = df["question category"].unique()
-
-for category in categories:
-    with st.expander(f"### {category}"):
-        subset = df[df["question category"] == category]
-        for _, row in subset.iterrows():
-            q = row["question"]
-            q_type = row["answer_type"].lower()
-            key = row["subcategory_code"]
-
-            if "yes/no" in q_type:
-                responses[key] = st.radio(q, ["Yes", "No"], key=key)
-            elif "numeric" in q_type:
-                responses[key] = st.number_input(q, step=1.0, key=key)
-            elif "date" in q_type:
-                responses[key] = st.date_input(q, key=key)
-            elif "text" in q_type:
-                responses[key] = st.text_input(q, key=key)
-            else:
-                responses[key] = st.text_input(q, key=key)
-
-# ---------- SUBMIT ----------
-if st.button("Submit Intake"):
-    st.success("✅ Intake submitted successfully!")
-    st.session_state["responses"] = responses
-
-# ---------- SCORING ----------
-def score_response(row, responses):
-    ans = responses.get(row["subcategory_code"], "")
-    if "yes/no" in row["answer_type"].lower():
-        return row["weight"] if ans == "Yes" else 0
-    elif "numeric" in row["answer_type"].lower():
-        try:
-            val = float(ans)
-            if val > 0:
-                return min(row["weight"], row["weight"] * 0.75)
-            else:
-                return 0
-        except:
-            return 0
-    elif "date" in row["answer_type"].lower():
-        return row["weight"] * 0.8
-    elif "text" in row["answer_type"].lower():
-        return row["weight"] * 0.5 if ans.strip() else 0
-    return 0
-
-# ---------- RESULTS ----------
-if "responses" in st.session_state:
-    df["auto_score"] = df.apply(lambda r: score_response(r, st.session_state["responses"]), axis=1)
-    total_weight = df["weight"].sum()
-    total_score = df["auto_score"].sum()
-    readiness = round((total_score / total_weight) * 100, 1)
-    tier = (
-        "Tier 1 – Hyperscale Ready" if readiness >= 85 else
-        "Tier 2 – Advanced" if readiness >= 65 else
-        "Tier 3 – Developing" if readiness >= 40 else
-        "Tier 4 – Early Stage"
-    )
+    with col2:
+        capacity = st.text_input("Planned Capacity (MW)")
+        utility = st.text_input("Utility or Co-op")
+        interconnect_status = st.selectbox(
+            "Interconnect Status",
+            ["Not Started", "In Progress", "Approved", "Operational"]
+        )
+        has_substation = st.radio("Substation Onsite?", ["Yes", "No"])
 
     st.markdown("---")
-    st.subheader("📊 PowerPath Index Summary")
+    st.header("Power & Energy Details")
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Weighted Score", f"{total_score:.1f}")
-    col2.metric("PowerPath Index", f"{readiness}%")
-    col3.metric("Readiness Tier", tier)
+    col3, col4 = st.columns(2)
+    with col3:
+        primary_power_source = st.text_input("Primary Power Source (e.g., Grid, Solar, Gas, BTM)")
+        secondary_source = st.text_input("Secondary Power Source (if any)")
+        total_capacity = st.text_input("Total Available Capacity (MW)")
+    with col4:
+        renewable_mix = st.slider("Renewable Energy %", 0, 100, 50)
+        grid_tie = st.text_input("Grid Tie Voltage (kV)")
+        microgrid_ready = st.radio("Microgrid-Ready?", ["Yes", "No"])
 
-    st.markdown("#### Category Breakdown")
-    cat_scores = df.groupby("question category")["auto_score"].sum() / df.groupby("question category")["weight"].sum() * 100
-    st.bar_chart(cat_scores)
+    st.markdown("---")
+    st.header("Development & Leasing Details")
 
-else:
-    st.info("⬆️ Fill out the intake form above to calculate readiness and generate your PowerPath Index.")
+    col5, col6 = st.columns(2)
+    with col5:
+        permitting = st.text_input("Permitting Status")
+        site_control = st.selectbox("Site Control", ["Owned", "LOI", "Option", "None"])
+    with col6:
+        leasing_status = st.selectbox(
+            "Leasing Status",
+            ["Not Marketed", "In Discussion", "LOI Signed", "Leased"]
+        )
+        target_tenants = st.text_area("Target Tenants / Hyperscalers")
+
+    st.markdown("---")
+    submitted = st.form_submit_button("Submit Project")
+
+if submitted:
+    st.success(f"✅ Project '{project_name}' submitted successfully!")
+    st.write("**Summary:**")
+    st.write({
+        "Project Name": project_name,
+        "Location": location,
+        "Acreage": acreage,
+        "Owner/Developer": owner,
+        "Capacity (MW)": capacity,
+        "Utility/Co-op": utility,
+        "Interconnect Status": interconnect_status,
+        "Substation Onsite": has_substation,
+        "Primary Power Source": primary_power_source,
+        "Secondary Power Source": secondary_source,
+        "Total Capacity": total_capacity,
+        "Renewable Mix %": renewable_mix,
+        "Grid Tie Voltage": grid_tie,
+        "Microgrid Ready": microgrid_ready,
+        "Permitting Status": permitting,
+        "Site Control": site_control,
+        "Leasing Status": leasing_status,
+        "Target Tenants": target_tenants
+    })
