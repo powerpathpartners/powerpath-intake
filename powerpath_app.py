@@ -1,74 +1,33 @@
 import streamlit as st
 import pandas as pd
 
-# --- PAGE CONFIG ---
+# --- PAGE SETUP ---
 st.set_page_config(page_title="The PowerPath Index", page_icon="⚡", layout="wide")
 
-# --- GLOBAL STYLES ---
-st.markdown("""
-    <style>
-        /* Center all headers and reduce default padding */
-        .block-container {
-            padding-top: 1rem;
-            padding-bottom: 0rem;
-            max-width: 1200px;
-            margin: auto;
-        }
-        h1, h2, h3 {
-            text-align: center !important;
-        }
-        /* Increase font sizes */
-        .main-title {
-            font-size: 350% !important;
-            margin-bottom: 0;
-        }
-        .sub-title {
-            font-size: 350% !important;
-            font-weight: 400;
-            margin-top: 0.3rem;
-            margin-bottom: 1.5rem;
-        }
-        /* Adjust logo spacing */
-        .logo-container img {
-            margin-top: 0.5in;
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-            width: 160px;
-        }
-        /* Style submit button */
-        div.stButton > button {
-            background-color: #0052cc;
-            color: white;
-            border-radius: 8px;
-            height: 3em;
-            font-size: 16px;
-            font-weight: 600;
-            border: none;
-        }
-        div.stButton > button:hover {
-            background-color: #003d99;
-            transition: 0.2s;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-# --- HEADER ---
-st.markdown("""
-    <div class="logo-container">
-        <img src="PPP logo transparent bg.png" alt="PowerPath Logo">
+# --- LOGO + HEADER ---
+st.markdown(
+    """
+    <div style="text-align:center; margin-top: -10px; margin-bottom: -10px;">
+        <img src="powerpath_logo.png" width="160" style="margin-top:0.5in;">
     </div>
-    <h1 class="main-title">The PowerPath Index</h1>
-    <h3 class="sub-title">Project Intake Form</h3>
-""", unsafe_allow_html=True)
+    <h1 style="text-align:center; font-size:350%; margin-bottom:0;">
+        The PowerPath Index
+    </h1>
+    <h3 style="text-align:center; font-size:350%; font-weight:normal; margin-top:5px;">
+        Project Intake Form
+    </h3>
+    """,
+    unsafe_allow_html=True,
+)
 
 st.markdown("---")
 
-# --- FORM ---
+# --- FORM SETUP ---
 st.header("Project Information")
 
 with st.form("project_form"):
     col1, col2 = st.columns(2)
+
     with col1:
         project_name = st.text_input("Project Name")
         location = st.text_input("Location (City, State)")
@@ -117,7 +76,7 @@ with st.form("project_form"):
 if submitted:
     st.success(f"✅ Project '{project_name}' submitted successfully!")
     st.write("**Summary:**")
-    st.json({
+    st.write({
         "Project Name": project_name,
         "Location": location,
         "Acreage": acreage,
