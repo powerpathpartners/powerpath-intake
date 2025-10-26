@@ -2,9 +2,10 @@ import streamlit as st
 import pandas as pd
 import urllib.parse
 from datetime import datetime
+from PIL import Image
 
 # ---------- PAGE CONFIG ----------
-st.set_page_config(page_title="PowerPath Intake", layout="wide")
+st.set_page_config(page_title="The PowerPath Index", layout="wide")
 
 # ---------- STYLE ----------
 st.markdown("""
@@ -12,6 +13,8 @@ st.markdown("""
         body { background-color: #f6f8fa; color: #222; }
         .block-container { padding-top: 1rem; padding-bottom: 2rem; }
         h1, h2, h3 { color: #044874 !important; }
+        .title-text { font-size: 2.2rem; font-weight: 700; color: #044874; text-align: center; }
+        .subtitle-text { font-size: 1.2rem; color: #444; text-align: center; margin-top: -0.3rem; }
         div[data-testid="stExpanderHeader"] {
             background-color: #04487410;
             font-weight: 600;
@@ -25,6 +28,14 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
+
+# ---------- LOGO & HEADER ----------
+logo = Image.open("PPP logo transparent bg.png")
+st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+st.image(logo, width=160)
+st.markdown("<div class='title-text'>The PowerPath Index™</div>", unsafe_allow_html=True)
+st.markdown("<div class='subtitle-text'>Project Intake Form</div><br>", unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
 # ---------- LOAD GOOGLE SHEET ----------
 SHEET_ID = "1_K7AOyKjzdwfqM7V9x6FxJYkVz-OSB5nNKbZtygLsak"
@@ -40,11 +51,9 @@ def load_data():
 
 df = load_data()
 
-# ---------- APP TITLE ----------
-st.title("⚙️ PowerPath Project Intake Form")
+# ---------- FORM ----------
 st.markdown("Use this tool to assess project readiness across key development categories. Responses auto-score against PowerPath benchmarks.")
 
-# ---------- FORM ----------
 responses = {}
 categories = df["question category"].unique()
 
